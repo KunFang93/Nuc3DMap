@@ -26,6 +26,15 @@ wget https://www.encodeproject.org/files/GRCh38_no_alt_analysis_set_GCA_00000140
 gunzip GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta.gz
 bwa index GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta
 ```
+**Recommendation, use trim_galore to trim the fastq file**
+```
+# Example code
+# For paired-end 
+trim_galore --trim-n --paired -j 5 -o ./ foo_R1.fastq.gz foo_R2.fastq.gz
+# For single-end
+trim_galore --trim-n -j 5 -o ./ foo.fastq.gz
+```
+
 ### Step1. Convert Hi-C and Micro-C fq/bam to .pairs and MNase bam to nuc_loc.bed file, do it as per-celltype wise, see the example file
 ```
 Nuc3DMap nucprep -ifs <input_files.txt, see the example file in example_files/input_files.txt> \
