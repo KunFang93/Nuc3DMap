@@ -37,7 +37,7 @@ trim_galore --trim-n --paired -j 5 -o ./ foo_R1.fastq.gz foo_R2.fastq.gz
 trim_galore --trim-n -j 5 -o ./ foo.fastq.gz
 ```
 
-### Step1. Convert Hi-C and Micro-C fq/bam to .pairs and MNase bam to nuc_loc.bed file, do it as per-celltype wise, see the example file
+#### Step1. Convert Hi-C and Micro-C fq/bam to .pairs and MNase bam to nuc_loc.bed file, do it as per-celltype wise, see the example file
 ```
 Nuc3DMap nucprep -ifs <input_files.txt, see the example file in example_files/input_files.txt> \
                  -gs <hg38.chroms.size, hg38.sizes.genome in /data> \
@@ -52,7 +52,7 @@ Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38
 or run in background:
 nohup Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30 &> nucprep.log &
 ```
-### Step2. Build nucleosome-level contact map for Hi-C and Micro-C seperately, save as .cool file
+#### Step2. Build nucleosome-level contact map for Hi-C and Micro-C seperately, save as .cool file
 ```
 Nuc3DMap nucload -pf <H1_HiC.pairs, from Nuc3DMap nucprep> \
                  -nucf <H1_nuc_loc.bed, from Nuc3DMap nucload> \
@@ -65,7 +65,7 @@ e.g,
 nohup Nuc3DMap nucload -pf MCF7_HiC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.hic.log &
 nohup Nuc3DMap nucload -pf MCF7_MicroC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.mic.log &
 ```
-### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
+#### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
 ```
 Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
                   -hc <./H1_HiC.cool, from Nuc3DMap nucload> \
@@ -74,7 +74,7 @@ Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
                   -od <./>
                   -refg <hg38>
 ```
-### Step4. Call NucDom
+#### Step4. Call NucDom
 ```
 Nuc3DMap nucdom -imhc <./H1_iMHiC.cool>
                 -ws <10 default 10>
