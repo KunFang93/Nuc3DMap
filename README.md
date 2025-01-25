@@ -73,6 +73,8 @@ Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
                         for other reference genomes or enzyme, please use Nuc3DMap_digest.py in utilites to generate>
                   -od <./>
                   -refg <hg38>
+e.g.,
+nohup Nuc3DMap nucmerge -mc ../nucload/MCF7_MicroC.1.0.cool -hc ../nucload/MCF7_HiC_mapped.1.0.cool -edf /data/kfang/NucOrg/Proj.110422/Nuc3DMap/data/hg38.HindIII.bed -od ./ -refg hg38 &> mcf7.nucmerge.log &
 ```
 #### Step4. Call NucDom
 ```
