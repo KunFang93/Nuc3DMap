@@ -20,7 +20,7 @@ pip install --editable .
 Method3: use singularity (work in progress)
 
 ## Quick Start
-**Note: Nuc3DMap might get poor results when sequence depth is not enough. We recommend at least 1b No-dup Pairs after Nuc3DMap nucprep (in foo.stats.summary.txt from nucprep)**  
+**Note: Nuc3DMap would get poor performance when sequence depth is not enough under current version. We recommend at least 1b No-dup Pairs after Nuc3DMap nucprep (in foo.stats.summary.txt from nucprep)**  
 
 **If input files contain fastq file, bwa index is needed before running Nuc3DMap nucprep**
 ```
