@@ -65,7 +65,7 @@ e.g,
 nohup Nuc3DMap nucload -pf MCF7_HiC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.hic.log &
 nohup Nuc3DMap nucload -pf MCF7_MicroC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.mic.log &
 ```
-#### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
+### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
 ```
 Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
                   -hc <./H1_HiC.cool, from Nuc3DMap nucload> \
