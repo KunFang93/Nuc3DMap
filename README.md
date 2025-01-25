@@ -35,7 +35,11 @@ Nuc3DMap nucprep -ifs <input_files.txt, see the example file in example_files/in
                  -inps <path/to/iNPS.py> \
                  -p <5>
 
-e.g Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30
+e.g
+Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30
+
+or run in background:
+nohup Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30 &> nucprep.log &
 ```
 ### Step2. Build nucleosome-level contact map for Hi-C and Micro-C seperately, save as .cool file
 ```
@@ -45,6 +49,8 @@ Nuc3DMap nucload -pf <H1_HiC.pairs, from Nuc3DMap nucprep> \
                  -gt <hg38.annot.final.bed, hg38.annot.final.bed in /data> \
                  -refg <hg38> \
                  -np <5, ray installation needed, if use slurm or sbatch, use -np 1 for sake of compatibility>
+
+
 ```
 #### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
 ```
