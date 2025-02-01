@@ -89,7 +89,7 @@ nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.
 Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 ```
 ## Maunal
-#### Overall
+#### Nuc3DMap
 ```
 Nuc3DMap --help
 
@@ -105,4 +105,114 @@ Commands:
   nucmerge  Merge Hi-C and Micro-C contact map
   nuctd     Calling NucDom/Boundary/Gap
   nucil     Detecting Nuc Interation Loci (NucIL)
+```
+#### Nuc3DMap nucprep
+```
+Usage: Nuc3DMap nucprep [OPTIONS]
+
+  Convert .fq/bam into .pairs and nuc_loc.bed
+
+Options:
+  -ifs, --inputfiles PATH   Inputfiles, each row contains either fastq or bm
+                            for a sample. Please refer to example_input check
+                            details
+  -gs, --gsize PATH         referencec genome size file, e.g, hg38.chrom.sizes
+  -name, --prefixname TEXT  Specify the prefix name
+  -mq, --minmapq INTEGER    minimum mapq for quality control
+  -bfa, --bwafasta PATH     Required if input format is fastq, the path for
+                            refernce fasta (bwa <idxbase>)
+  -inps, --inpsdir PATH     Required if input has MNase-seq, the path of
+                            iNPS.py. For example,
+                            /data/NucHMM/scripts/iNPS_V1.2.2.py.
+  -td, --tmpdir PATH        temporary folder to store intermediate results
+  -p, --threads INTEGER     Number of threads, default 5
+  --help                    Show this message and exit.
+```
+#### Nuc3DMap nucload
+```
+Usage: Nuc3DMap nucload [OPTIONS]
+
+  Build nucleosome-level contact map
+
+Options:
+  -pf, --pairsfile PATH        Input pairs  [required]
+  -nucf, --nuclocfile PATH     The nucleosome position files  [required]
+  -gt, --geneannot PATH        reference genes annotation file  [required]
+  -od, --outdir PATH           Specify the output files path and name.
+  -refg, --refgenome TEXT      The name of reference genome, currently accept
+                               hg19|hg38
+  -rnolp, --reportnooverlap    Flag of saving pairs that are not directed
+                               overlapped or overlapped length less than
+                               cutoff
+  -sr, --statsreport           Flag of plotting distributions of variables in
+                               nucload
+  -olpc, --overlapcut INTEGER  cutoff for overlapping length between pairs and
+                               map bins, default 1 (auto mode is -1)
+  -m, --match TEXT             best: one pair only belong to one bin | multi:
+                               one pair belong can assgin to multiple bins
+  -cs, --chunksize INTEGER     The chunksize to load the .pairs file
+  -spl, --sampling FLOAT       Sampling pairs for robust test, ignore for
+                               normal usage, [0,1]
+  -np, --nproc INTEGER         The number of parallel processors
+  --help                       Show this message and exit.
+```
+#### Nuc3DMap nucmerge
+```
+Usage: Nuc3DMap nucmerge [OPTIONS]
+
+  Merge Hi-C and Micro-C contact map
+
+Options:
+  -mc, --microc PATH          MicroC.cool resulted from nucload.  [required]
+  -hc, --hic PATH             HiC.cool resulted from nucload.  [required]
+  -edf, --enzymedigestf PATH  enzyme digestion file  [required]
+  -od, --outdir PATH          Specify the output files path and name.
+  -refg, --refgenome TEXT     The name of reference genome, currently accept
+                              hg19|hg38, default hg38
+  -vis, --visualize           Visualize convergence and MD plot, which will
+                              slow down the process
+  -smf, --savetmpfile         Save temporary files
+  -umf, --usetmpfile          Skipp first step, directly use temporary files
+  --help                      Show this message and exit.
+```
+#### Nuc3DMap nuctd
+```
+Usage: Nuc3DMap nuctd [OPTIONS]
+
+  Calling NucDom/Boundary/Gap
+
+Options:
+  -imhc, --imhiccool PATH  Integrated MicroC-HiC.cool resulted from nucmerge.
+                           [required]
+  -ws, --winsize INTEGER   window size for calling NucDom
+  -od, --outdir PATH       Specify the output directory
+  -ss, --shiftsize FLOAT   Empirical shift size for boundaries, default 0
+  -rg, --rgmap             Input is renormalized grouping map
+  --help                   Show this message and exit.
+```
+#### Nuc3DMap nucil
+```
+Usage: Nuc3DMap nucil [OPTIONS]
+
+  Detecting Nuc Interation Loci (NucIL)
+
+Options:
+  -imhc, --imhiccool PATH       Integrated MicroC-HiC.cool resulted from
+                                nucmerge.  [required]
+  -t, --tads PATH               NucDom.txt from nucdom  [required]
+  -rg, --rgmap PATH             If RGMap have built, use this command to skip
+                                it
+  -dup, --distanceup INTEGER    The maximum distance for detecting NucIL,
+                                default 2Mb
+  -dlow, --distancelow INTEGER  The maximum distance for detecting NucIL,
+                                default 5kb
+  -q, --fdr FLOAT               FDR cutoff for detecting NucIL, default 0.1
+  -s, --sigma FLOAT             sigma for initial Gaussian smoothing , default
+                                0.5
+  -em, --extmode TEXT           Choose among None|constant|adjacent,
+                                represents NoExt|Ext +/-3000|Ext adjacent
+                                Nucdom.
+  -od, --outdir PATH            Specify the output directory
+  -np, --nproc INTEGER          The number of parallel processors
+  --help                        Show this message and exit.
 ```
