@@ -89,4 +89,20 @@ nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.
 Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 ```
 ## Maunal
-Work in Progress
+#### Overall
+```
+Nuc3DMap --help
+
+Usage: Nuc3DMap [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --version  Show the version and exit.
+  --help     Show this message and exit.
+
+Commands:
+  nucprep   Convert .fq/bam into .pairs and nuc_loc.bed
+  nucload   Build nucleosome-level contact map
+  nucmerge  Merge Hi-C and Micro-C contact map
+  nuctd     Calling NucDom/Boundary/Gap
+  nucil     Detecting Nuc Interation Loci (NucIL)
+```
