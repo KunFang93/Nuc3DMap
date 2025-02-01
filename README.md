@@ -47,10 +47,10 @@ Nuc3DMap nucprep -ifs <input_files.txt, see the example file in example_files/in
                  -p <5>
 
 e.g
-Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30
+Nuc3DMap nucprep -ifs input_h1.txt -gs hg38.chrom.sizes -name H1 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30
 
 or run in background:
-nohup Nuc3DMap nucprep -ifs input_mcf7.txt -gs hg38.chrom.sizes -name MCF7 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30 &> nucprep.log &
+nohup Nuc3DMap nucprep -ifs input_h1.txt -gs hg38.chrom.sizes -name H1 -bfa GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps ./Nuc3DMap/iNPS_V1.2.3.py -p 30 &> nucprep.log &
 ```
 #### Step2. Build nucleosome-level contact map for Hi-C and Micro-C seperately, save as .cool file
 ```
@@ -62,8 +62,8 @@ Nuc3DMap nucload -pf <H1_HiC.pairs, from Nuc3DMap nucprep> \
                  -np <5, ray installation needed, if use slurm or sbatch, use -np 1 for sake of compatibility>
 
 e.g,
-nohup Nuc3DMap nucload -pf MCF7_HiC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.hic.log &
-nohup Nuc3DMap nucload -pf MCF7_MicroC_mapped.pairs -nucf nucprep/nuc_calling_result/MCF7_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> mcf7.mic.log &
+nohup Nuc3DMap nucload -pf H1_HiC_mapped.pairs -nucf H1_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> h1.hic.log &
+nohup Nuc3DMap nucload -pf H1_MicroC_mapped.pairs -nucf H1_MNase_nucleosome_location.bed -od ./ -gt hg38.annot.final.bed -refg hg38 -np 20 &> h1.mic.log &
 ```
 #### Step3. Merge Hi-C and Micro-C nucleosome level contact map.
 ```
@@ -74,7 +74,7 @@ Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
                   -od <./>
                   -refg <hg38>
 e.g.,
-nohup Nuc3DMap nucmerge -mc ../nucload/MCF7_MicroC.1.0.cool -hc ../nucload/MCF7_HiC_mapped.1.0.cool -edf /data/kfang/NucOrg/Proj.110422/Nuc3DMap/data/hg38.HindIII.bed -od ./ -refg hg38 &> mcf7.nucmerge.log &
+nohup Nuc3DMap nucmerge -mc ../nucload/H1_MicroC.1.0.cool -hc ../nucload/H1_HiC_mapped.1.0.cool -edf /data/kfang/NucOrg/Proj.110422/Nuc3DMap/data/hg38.HindIII.bed -od ./ -refg hg38 &> h1.nucmerge.log &
 ```
 #### Step4. Call NucDom/NucBoundary/NucGap
 ```
@@ -82,8 +82,11 @@ Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
                 -ws <10 default 10>
                 -od <./>
 e.g.,
-nohup Nuc3DMap nuctd -imhc ../nucmerge/MCF7_iMHiC_212025.cool -ws 10 -od ./ &> mcf7.nuctd.log &
+nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.nuctd.log &
 ```
-
+#### Step5. Detec NucIL and NucLoop
+```
+Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
+```
 ## Maunal
 Work in Progress
