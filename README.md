@@ -76,11 +76,13 @@ Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
 e.g.,
 nohup Nuc3DMap nucmerge -mc ../nucload/MCF7_MicroC.1.0.cool -hc ../nucload/MCF7_HiC_mapped.1.0.cool -edf /data/kfang/NucOrg/Proj.110422/Nuc3DMap/data/hg38.HindIII.bed -od ./ -refg hg38 &> mcf7.nucmerge.log &
 ```
-#### Step4. Call NucDom
+#### Step4. Call NucDom/NucBoundary/NucGap
 ```
-Nuc3DMap nucdom -imhc <./H1_iMHiC.cool>
+Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
                 -ws <10 default 10>
                 -od <./>
+e.g.,
+nohup Nuc3DMap nuctd -imhc ../nucmerge/MCF7_iMHiC_212025.cool -ws 10 -od ./ &> mcf7.nuctd.log &
 ```
 
 ## Maunal
