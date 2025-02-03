@@ -1,4 +1,4 @@
-## This folder collects the processed Nucleosome-level chromatin organization
+## This folder collects the processed nucleosome-level chromatin organization
 
 ### H1 (hg38)
 ```
