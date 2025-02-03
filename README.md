@@ -89,7 +89,7 @@ nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.
 Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 
 e.g.,
-nohup Nuc3DMap nucil -imhc ../nucmerge/MCF7_iMHiC_212025.cool -t ../nuctd/MCF7_iMHiC.win10.txt -od ./ -np 20 &>mcf7.nucil.log &
+nohup Nuc3DMap nucil -imhc ../nucmerge/H1_iMHiC_212025.cool -t ../nuctd/H1_iMHiC.win10.txt -od ./ -np 20 &>h1.nucil.log &
 ```
 ## Maunal
 #### Nuc3DMap
