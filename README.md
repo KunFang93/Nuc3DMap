@@ -4,8 +4,8 @@ A comprehensive tool to study nucleosome-level genome architectures
 Method1: direct conda installation, need bioconda repo
 ```
 conda create -n Nuc3DMap python=3
-conda install bwa samtools pairtools deeptools bedtools
-conda install cooler pyranges psutil numba tqdm seaborn statsmodels
+conda install bwa samtools pairtools deeptools bedtools 
+conda install cooler pyranges psutil numba tqdm seaborn statsmodels pybedtools
 conda install anaconda::scikit-learn
 pip install -U ray # if need to use parallel for NucLoad
 cd /path/Nuc3DMap
