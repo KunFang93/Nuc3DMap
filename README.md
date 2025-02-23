@@ -84,7 +84,7 @@ Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
 e.g.,
 nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.nuctd.log &
 ```
-#### Step5. Detec NucIL and NucLoop
+#### Step5. Detect NucIL and NucLoop
 ```
 Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 
