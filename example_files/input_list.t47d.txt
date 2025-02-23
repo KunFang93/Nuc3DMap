@@ -1,0 +1,2 @@
+T47D_MicroC_rep1_R1.sample10M.fastq.gz T47D_MicroC_rep1_R2.sample10M.fastq.gz MicroC
+T47DTR_Mnase_rep1.sample10M.fastq.gz SE MNase

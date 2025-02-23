@@ -1,0 +1,5 @@
+# note uncompressed file also accepted, remove this annotation line when using nucprep 
+foo_HiC_R1.fq.gz foo_HiC_R2.fq.gz HiC
+foo_MicroC_R1.fq.gz foo_MicroC_R2.fq.gz MicroC
+foo_MNase_R1.fq.gz foo_MNase_R2.fq.gz PE MNase
+foo_MNase.fq.gz SE MNase
