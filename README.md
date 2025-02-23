@@ -76,7 +76,7 @@ Nuc3DMap nucmerge -mc <./H1_MicroC.cool, from Nuc3DMap nucload> \
 e.g.,
 nohup Nuc3DMap nucmerge -mc ../nucload/H1_MicroC.1.0.cool -hc ../nucload/H1_HiC_mapped.1.0.cool -edf /data/kfang/NucOrg/Proj.110422/Nuc3DMap/data/hg38.HindIII.bed -od ./ -refg hg38 &> h1.nucmerge.log &
 ```
-#### Step4. Call NucDom/NucBoundary/NucGap
+#### Step4. Call NucD(om)/NucB(oundary)/NucG(ap)
 ```
 Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
                 -ws <10 default 10>
@@ -84,7 +84,7 @@ Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
 e.g.,
 nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.nuctd.log &
 ```
-#### Step5. Detect NucIL and NucLoop
+#### Step5. Detect NucIL and NucL(oop)
 ```
 Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 
