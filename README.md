@@ -91,6 +91,9 @@ Nuc3DMap nucil -imhc <./H1_iMHiC>.cool -t <./H1_iMHiC>.win10.txt -od ./ -np 20
 e.g.,
 nohup Nuc3DMap nucil -imhc ../nucmerge/H1_iMHiC_212025.cool -t ../nuctd/H1_iMHiC.win10.txt -od ./ -np 20 &>h1.nucil.log &
 ```
+
+#### For visualizing nucleosome-level matrix, as it's a part of unpublished visual tool. please reach out to me to get the script. Sorry for the inconvenience.
+
 ## Maunal
 #### Nuc3DMap
 ```
