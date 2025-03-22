@@ -1,7 +1,7 @@
 # Nuc3DMap
 A comprehensive tool to study nucleosome-level genome architectures 
 ## Installation
-Method1: direct conda/mamba installation, need bioconda repo (mamba is recommended)
+Method1: direct conda/mamba installation, need bioconda repo (**mamba is recommended**)
 ```
 mamba create -n Nuc3DMap python=3
 mamba install bwa samtools pairtools deeptools bedtools 
