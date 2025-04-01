@@ -92,7 +92,7 @@ e.g.,
 nohup Nuc3DMap nucil -imhc ../nucmerge/H1_iMHiC_212025.cool -t ../nuctd/H1_iMHiC.win10.txt -od ./ -np 20 &>h1.nucil.log &
 ```
 
-#### Note: For visualizing nucleosome-level matrix, please reach out to me to get the script as it's a part of unpublished visual tool. Sorry for the inconvenience.
+#### Note: For visualizing nucleosome-level matrix, please reach out to me to get the script.
 
 ## Maunal
 #### Nuc3DMap
