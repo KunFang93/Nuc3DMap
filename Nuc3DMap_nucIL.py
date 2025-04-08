@@ -487,12 +487,19 @@ def Q_FDR_DS(q_df,sift_df):
     q_final = q_final[sift_df.columns]
     return q_final
 def NucIL_detection(blocksum_clr, distance_up_filter = 2000000, distance_low_filter = 5000, pt = 0.1, sigma0 = 0.5,
-                    intensity_cut = 0.0, nprocesser = 20, extmode = None):
+                    intensity_cut = 0.0, nprocesser = 20, extmode = None, lowdepth = False):
     chroms = blocksum_clr.chromnames
     ignore_diags = 2
-    sts = [0.25, 0.75]  # spatial threshold, used to filter out interactions based on spatial density. default 0.5
+    sts = [0.25, 0.75]  # spatial threshold, used to filter out interactions based on spatial density. combine 0.25 and 0.75 results
     octaves = 2  # Increasing the number of octaves means that the algorithm will search for key points across a larger range of scales.
-    fp_size = 5
+    if lowdepth:
+        fp_size = 3
+        pt = 0.2
+        sigma0 = 0.3
+        qcut = 0.995
+    else:
+        fp_size = 5
+        qcut = 0.999
     st_nucloop = []
     for st in sts:
         nucloop_list = []
@@ -546,7 +553,7 @@ def NucIL_detection(blocksum_clr, distance_up_filter = 2000000, distance_low_fil
     nucloops_df_sift = pd.concat(st_nucloop).drop_duplicates()
     print("SIFT Detection Finished")
     # In case some high intensity pixels are missed because the background comparison, sepcifically in middle ranges
-    nucloops_df_qcut = QuantileDetection(blocksum_clr,dist_lowcut=100000, dist_upcut=2000000, qcut=0.999)
+    nucloops_df_qcut = QuantileDetection(blocksum_clr,dist_lowcut=100000, dist_upcut=2000000, qcut=qcut)
     # Adjust format by comparative analysis
     nucloops_df_qcut_final = Q_FDR_DS(nucloops_df_qcut,nucloops_df_sift)
     # combine all NucIL

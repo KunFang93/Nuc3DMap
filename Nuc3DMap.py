@@ -464,12 +464,13 @@ def nuctd(imhiccool, winsize, outdir, shiftsize, rgmap, translearning):
 @click.option('--distancelow', '-dlow', default = 5000, type=int, help='The maximum distance for detecting NucIL, default 5kb')
 @click.option('--fdr', '-q', default = 0.1, type=float, help='FDR cutoff for detecting NucIL, default 0.1')
 @click.option('--sigma', '-s', default = 0.5, type=float, help='sigma for initial Gaussian smoothing , default 0.5')
+@click.option('--lowdepth','-ld',default=False, is_flag=True, help= 'Low depth mode for NucIL. Use with cautions, barely statistic power under this mode. Will use internal parameters instead of input params.')
 @click.option('--extmode', '-em', default=None, help='Choose among None|constant|adjacent, represents NoExt|Ext +/-3000|Ext adjacent Nucdom.')
 @click.option('--outdir', '-od', type=click.Path(), help='Specify the output directory')
 @click.option('--nucloop','-nl',is_flag=True, help="Output NucLoops that at least one end located in promoter region. -gt Reference bed file is requested")
 @click.option('--geneannot','-gt', type=click.Path(),help="'reference genes annotation file'")
 @click.option('--nproc', '-np', default = 8, type=int, help='The number of parallel processors')
-def nucil(imhiccool, tads, rgmap, outdir, distanceup, distancelow, fdr, sigma, nproc, extmode, geneannot, nucloop):
+def nucil(imhiccool, tads, rgmap, outdir, distanceup, distancelow, fdr, sigma, nproc, lowdepth, extmode, geneannot, nucloop):
     prefix = os.path.basename(imhiccool).split('_')[0]
     imhic_clr = cooler.Cooler(imhiccool)
     tads_df = pd.read_table(tads)
@@ -488,7 +489,7 @@ def nucil(imhiccool, tads, rgmap, outdir, distanceup, distancelow, fdr, sigma, n
                                                   distance_up_filter = distanceup,
                                                   distance_low_filter = distancelow,
                                                   pt = fdr, nprocesser = nproc, sigma0=sigma,
-                                                  extmode = extmode)
+                                                  extmode = extmode, lowdepth=lowdepth)
     nucil_df.to_csv(f'{outdir}/{prefix}_iMHiC_NucILoc.txt', index=False, sep='\t')
     nucil_bedpe.to_csv(f'{outdir}/{prefix}_iMHiC_NucILoc.bedpe', sep='\t', index=False, header=None)
     if nucloop:
@@ -498,3 +499,4 @@ def nucil(imhiccool, tads, rgmap, outdir, distanceup, distancelow, fdr, sigma, n
         else:
             nucloops_df = transfer_NucLoop(nucil_df, geneannot)
             nucloops_df.to_csv(f'{outdir}/{prefix}_iMHiC_NucLoops.csv', index=False)
+
