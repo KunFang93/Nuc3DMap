@@ -17,7 +17,7 @@ conda env create -f <path to Nuc3DMap>/scripts/env.yml
 cd /path/Nuc3DMap
 pip install --editable .
 ```
-Method3: use singularity (work in progress)
+
 
 ## Quick Start
 **Note: Nuc3DMap might get poor performance when sequence depth is not enough under current version. We recommend to use Nuc3DMap with at least 1b No-dup Pairs after Nuc3DMap nucprep (in foo.stats.summary.txt from nucprep).** If sequence depth is not enough, you could try -tl in nuctd and -ld in nucil with less statistical power :/
