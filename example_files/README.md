@@ -10,3 +10,4 @@ wget https://www.dropbox.com/scl/fi/oubj2l8m3l0e5j0gjdf0g/T47DTR_Mnase_rep1.samp
 ```
 Nuc3DMap nucprep -ifs input_list.txt -gs <path>/hg38.chrom.sizes -bfa <path>/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta -inps <path>/iNPS_V1.2.3.py -p 10
 ```
+**Note: this example file only show the input for nucprep**
