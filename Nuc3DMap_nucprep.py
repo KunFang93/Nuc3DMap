@@ -31,7 +31,7 @@ def prepfromfastq(fastq_r1, fastq_r2, prefix, ref_fasta, gsize, minmapq, tmpdir,
                     f'pairtools split --nproc-in {nthreads} --nproc-out {nthreads} --output-pairs {prefix}_mapped.pairs --output-sam - | '
                     f'samtools view -bS -@ {nthreads} | samtools sort -@ {nthreads} -o {prefix}_mapped.bam', shell=True)
     subprocess.call(f'samtools index {prefix}_mapped.bam', shell=True)
-    get_qc(f'{prefix}.txt', f'{prefix}.summary.txt')
+    get_qc(f'{prefix}.stats.txt', f'{prefix}.summary.txt')
     print("prepfromfastq Finished.")
 
 def prepfrombam(bam_f, prefix, gsize, minmapq, tmpdir, nthreads):
