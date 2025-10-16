@@ -464,6 +464,13 @@ def Q_FDR_DS(q_df,sift_df):
             cur_sift = sift_df_gp.get_group(chrom)
             min_I = chrom_df['Intensities'].min()
             cur_sift_filt = cur_sift[cur_sift['Intensities'] >= min_I]
+            # Check if cur_sift_filt is empty
+            if len(cur_sift_filt) == 0:
+                # use the constant FDR and DETECTION SCALE
+                chrom_df['FDR'] = 0.01
+                chrom_df['DETECTION SCALE'] = 0.6155
+                q_chroms.append(chrom_df)
+                continue
             # Create a linear regression model
             fdr_model = LinearRegression()
             # Fit the model
@@ -555,9 +562,13 @@ def NucIL_detection(blocksum_clr, distance_up_filter = 2000000, distance_low_fil
     # In case some high intensity pixels are missed because the background comparison, sepcifically in middle ranges
     nucloops_df_qcut = QuantileDetection(blocksum_clr,dist_lowcut=100000, dist_upcut=2000000, qcut=qcut)
     # Adjust format by comparative analysis
-    nucloops_df_qcut_final = Q_FDR_DS(nucloops_df_qcut,nucloops_df_sift)
+    if len(nucloops_df_qcut) == 0:
+        # Create empty DataFrame with same columns as nucloops_df_sift
+        nucloops_df_qcut_final = pd.DataFrame(columns=nucloops_df_sift.columns)
+    else:
+        nucloops_df_qcut_final = Q_FDR_DS(nucloops_df_qcut,nucloops_df_sift)
     # combine all NucIL
-    nucloops_df_final = pd.concat([nucloops_df_sift,nucloops_df_qcut_final])
+    nucloops_df_final = pd.concat([nucloops_df_sift,nucloops_df_qcut_final], ignore_index=True)
     # remove duplicated row
     nucloops_df_final.drop_duplicates(['sidx','eidx'],inplace=True)
     print("Quantile Detection Finished")
