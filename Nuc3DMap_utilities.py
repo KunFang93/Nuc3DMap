@@ -228,4 +228,4 @@ def get_qc(stat_f, outf):
     data.append(["No-Dup Cis Read Pairs >= 10kb", cis_gt10kb_str, f"{percent_cis_gt10kb}%"])
     # Convert to DataFrame and save to file
     df = pd.DataFrame(data, columns=["Metric", "Count", "Percentage"])
-    df.to_csv(outf, index=False)
+    df.to_csv(outf, index=False,sep='\t')

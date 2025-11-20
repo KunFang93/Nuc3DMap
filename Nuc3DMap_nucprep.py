@@ -23,15 +23,21 @@ def remove_extension_and_suffix(file_path):
     return file_name
 
 def prepfromfastq(fastq_r1, fastq_r2, prefix, ref_fasta, gsize, minmapq, tmpdir, nthreads):
-    subprocess.call(f'bwa mem -5SP -T0 -t {nthreads} {ref_fasta} {fastq_r1} {fastq_r2} | '
-                    f'pairtools parse2 --min-mapq {minmapq} --report-position read --report-orientation read --add-pair-index '
-                    f'--add-columns pos5,pos3 --max-inter-align-gap 30 --nproc-in {nthreads} --nproc-out {nthreads} --chroms-path {gsize} | '
-                    f'pairtools sort --tmpdir={tmpdir} --nproc {nthreads} | '
-                    f'pairtools dedup --nproc-in {nthreads} --nproc-out {nthreads} --mark-dups --output-stats {prefix}.stats.txt | '
-                    f'pairtools split --nproc-in {nthreads} --nproc-out {nthreads} --output-pairs {prefix}_mapped.pairs --output-sam - | '
-                    f'samtools view -bS -@ {nthreads} | samtools sort -@ {nthreads} -o {prefix}_mapped.bam', shell=True)
-    subprocess.call(f'samtools index {prefix}_mapped.bam', shell=True)
-    get_qc(f'{prefix}.stats.txt', f'{prefix}.summary.txt')
+    if os.path.exists(f'{prefix}_mapped.bam'):
+        print(f'{prefix}_mapped.bam existed!')
+    else:
+        subprocess.call(f'bwa mem -5SP -T0 -t {nthreads} {ref_fasta} {fastq_r1} {fastq_r2} | '
+                        f'pairtools parse2 --min-mapq {minmapq} --report-position read --report-orientation read --add-pair-index '
+                        f'--add-columns pos5,pos3 --max-inter-align-gap 30 --nproc-in {nthreads} --nproc-out {nthreads} --chroms-path {gsize} | '
+                        f'pairtools sort --tmpdir={tmpdir} --nproc {nthreads} | '
+                        f'pairtools dedup --nproc-in {nthreads} --nproc-out {nthreads} --mark-dups --output-stats {prefix}.stats.txt | '
+                        f'pairtools split --nproc-in {nthreads} --nproc-out {nthreads} --output-pairs {prefix}_mapped.pairs --output-sam - | '
+                        f'samtools view -bS -@ {nthreads} | samtools sort -@ {nthreads} -o {prefix}_mapped.bam', shell=True)
+        subprocess.call(f'samtools index {prefix}_mapped.bam', shell=True)
+    if os.path.exists(f'{prefix}.summary.txt'):
+        print(f'{prefix}.summary.txt existed!')
+    else:
+        get_qc(f'{prefix}.stats.txt', f'{prefix}.summary.txt')
     print("prepfromfastq Finished.")
 
 def prepfrombam(bam_f, prefix, gsize, minmapq, tmpdir, nthreads):
