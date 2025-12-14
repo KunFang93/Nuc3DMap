@@ -176,11 +176,47 @@ class AnchorNorm(object):
                     hic_outliers = self._is_outlier(dig_g_df['count_HiC'].values,5)
                     microc_outliers = self._is_outlier(dig_g_df['count_MiC'].values, 5)
                     dig_g_df_rm = dig_g_df[~(hic_outliers | microc_outliers)]
+                    
+                    # Early check: need >= 2 points AND variance in HiC for polyfit
+                    if len(dig_g_df_rm) < 2:
+                        # Not enough points, add to big difference (will get LOESS normalized)
+                        lowess_lists_bd.append(dig_g_df.index.values)
+                        continue
+                    
+                    hic_std = np.std(dig_g_df_rm['count_HiC'].values)
+                    mic_std = np.std(dig_g_df_rm['count_MiC'].values)
+                    
+                    if hic_std < 1e-10:
+                        # No variance in HiC - can't fit line, but can infer relationship
+                        if dig_g_df_rm['count_MiC'].sum() > dig_g_df_rm['count_HiC'].sum():
+                            # MicroC >> HiC (e.g., HiC=[0,0], MiC=[4,6]) → big difference
+                            lowess_lists_bd.append(dig_g_df.index.values)
+                        else:
+                            # Both low or HiC >= MiC → treat as small difference
+                            lowess_lists_sd.append(dig_g_df.index.values)
+                        continue
+                    
                     try:
                         gb_line = np.polyfit(dig_g_df_rm['count_HiC'], dig_g_df_rm['count_MiC'], 1)
-                    except ValueError:
-                        # print("PolyFit failed, count_HiC are all 0 after outlier filter. Add small epsilon")
-                        gb_line = np.polyfit(dig_g_df_rm['count_HiC'].values + 0.1, dig_g_df_rm['count_MiC'], 1)
+                    except (ValueError, np.linalg.LinAlgError, SystemError):
+                        # SystemError is the actual exception raised (ValueError is just __cause__)
+                        print("PolyFit failed due to numerical issues. Trying with epsilon...")
+                        try:
+                            gb_line = np.polyfit(dig_g_df_rm['count_HiC'].values + 0.1, dig_g_df_rm['count_MiC'], 1)
+                        except (ValueError, np.linalg.LinAlgError, SystemError):
+                            # Manual fallback: simple linear regression formula
+                            hic_vals = dig_g_df_rm['count_HiC'].values.astype(np.float64)
+                            mic_vals = dig_g_df_rm['count_MiC'].values.astype(np.float64)
+                            hic_mean, mic_mean = np.mean(hic_vals), np.mean(mic_vals)
+                            denom = np.sum((hic_vals - hic_mean) ** 2)
+                            if denom > 1e-10:
+                                slope = np.sum((hic_vals - hic_mean) * (mic_vals - mic_mean)) / denom
+                                gb_line = np.array([slope, mic_mean - slope * hic_mean])
+                            else:
+                                # Cannot fit, treat as big difference and skip
+                                lowess_lists_bd.append(dig_g_df.index.values)
+                                continue
+
                     gb_lines_dict[dig_g] = gb_line
                     if abs(gb_line[0]) < slope_cut:
                         lowess_lists_sd.append(dig_g_df.index.values)
@@ -208,7 +244,7 @@ class AnchorNorm(object):
             print("Cannot find Any Anchors. Please consider increasing sequence depth")
             exit(1)
         # step4: get regional coefficient for non-lowess part by averaging the lowess part coefficient
-        print("Step4: Linear interplotes the 0 Digsite..")
+        print("Step4: Linear interplotes bins with 0 Digest Enzyme..")
         current_md_normed = self.current_md.copy()
         current_md_normed[['count_HiC_norm', 'count_MiC_norm']] = md_normed[['count_HiC', 'count_MiC']]
         current_md_normed['HiC_coef'] = (current_md_normed['count_HiC_norm'] + 1) / (current_md_normed['count_HiC'] + 1)
