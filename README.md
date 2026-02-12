@@ -20,7 +20,6 @@ pip install --editable .
 
 
 ## Quick Start
-**Note: Nuc3DMap might get poor performance when sequence depth is not enough under current version. We recommend to use Nuc3DMap with at least 1billion No-dup Pairs after Nuc3DMap nucprep (in foo.stats.summary.txt from nucprep).** If sequence depth is not enough, you could try -tl in nuctd and -ld in nucil with less statistical power :/
 
 **If input files contain fastq file, bwa index is needed before running Nuc3DMap nucprep**
 ```
@@ -92,7 +91,7 @@ e.g.,
 nohup Nuc3DMap nucil -imhc ../nucmerge/H1_iMHiC_212025.cool -t ../nuctd/H1_iMHiC.win10.txt -od ./ -np 20 &>h1.nucil.log &
 ```
 
-
+**Note: Nuc3DMap might get poor performance when sequence depth is not enough under current version. We recommend to use Nuc3DMap with at least 1billion No-dup Pairs after Nuc3DMap nucprep (in foo.stats.summary.txt from nucprep).** If sequence depth is not enough, you could try -tl in nuctd and -ld in nucil with less statistical power :/
 
 ## Maunal
 #### Nuc3DMap
