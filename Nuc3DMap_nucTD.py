@@ -10,41 +10,96 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import pybedtools as pybt
 import cooler
+from numba import njit
+from joblib import Parallel, delayed
 
-def Get_Diamond_Matrix_Mean(data, i, size):
-    lowerbound = max(0, i - size + 1)
-    upperbound = min(i + size + 1, data.shape[1])
-    if i >= data.shape[1] - 1 or upperbound <= i + 1:
-        return None
-    diamond_slice = data[lowerbound:i + 1, i + 1:upperbound]
-    return diamond_slice.mean()
+@njit
+def accumulate_diagonal(sum_arr, diag, shift_start, shift_end):
+    n_diag = len(diag)
+    n_sum = len(sum_arr)
+    for offset in range(shift_start, shift_end + 1):
+        for j in range(n_diag):
+            pos = offset + j
+            if pos < n_sum:
+                sum_arr[pos] += diag[j]
+
+def Get_Diamond_Matrix_Mean(data, size):
+    N = data.shape[0]
+    sum_arr = np.zeros(N, dtype=np.float64)
+    
+    # Iterate over diagonals
+    # We need diagonals k where 1 <= k < 2*size
+    for k in range(1, 2 * size):
+        diag = data.diagonal(k)
+        if len(diag) == 0:
+            continue
+            
+        # Determine the range of i relative to r (row index) that this diagonal contributes to
+        shift_start = max(0, k - size)
+        shift_end = min(size - 1, k - 1)
+        
+        if shift_start > shift_end:
+            continue
+            
+        # Vectorized addition with numba
+        accumulate_diagonal(sum_arr, diag, shift_start, shift_end)
+
+    # Calculate areas
+    idxs = np.arange(N)
+    lowerbounds = np.maximum(0, idxs - size + 1)
+    upperbounds = np.minimum(idxs + size + 1, N)
+    areas = (idxs + 1 - lowerbounds) * (upperbounds - idxs - 1)
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        means = sum_arr / areas
+        
+    means[areas == 0] = np.nan
+    return means
 
 def Which_Gap_Region(data):
-    n_bins = data.shape[1]
-    gap = np.zeros(n_bins)
+    # ~1.5x faster than old
+    n_bins = data.shape[0]
+
+    upper = triu(data, format='csr')
+    upper.sort_indices()
+
+    M = np.full(n_bins, n_bins, dtype=np.int32)
+    row_nnz = np.diff(upper.indptr)
+    has_entries = row_nnz > 0
+    rows_with = np.where(has_entries)[0]
+    M[rows_with] = upper.indices[upper.indptr[rows_with]]
+
+    S = np.minimum.accumulate(M[::-1])[::-1]
+
+    gap_indices = []
     i = 0
     while i < n_bins:
-        j = i + 1
-        while j < n_bins and np.sum(data[i:j+1, i:j+1]) == 0:
-            gap[i:j + 1] = -0.5
-            j += 1
-        i = j
-    idx = np.where(gap == -0.5)[0]
-    return idx
+        break_idx = S[i]
+        gap_end = break_idx - 1
+        if gap_end >= i + 1:
+            gap_indices.extend(range(i, gap_end + 1))
+            i = break_idx
+        else:
+            i += 1
+    return np.array(gap_indices, dtype=int)
 
 def Which_process_region(rmv_idx, n_bins, min_size):
-    proc_regions = dict()
+    # ~8x faster
     proc_set = np.setdiff1d(np.arange(n_bins), rmv_idx)
-    n_proc_set = len(proc_set)
-    i = 0
-    while i < n_proc_set:
-        start = proc_set[i]
-        j = i + 1
-        while j < n_proc_set and (proc_set[j] - proc_set[j-1] <= 1):
-            j += 1
-        if abs(proc_set[j - 1] - start) >= min_size:
-            proc_regions[start] = {'start': start, 'end': proc_set[j-1]}
-        i = j
+    if len(proc_set) == 0:
+        return dict()
+
+    breaks = np.where(np.diff(proc_set) > 1)[0]
+    run_starts = np.concatenate([[0], breaks + 1])
+    run_ends = np.concatenate([breaks, [len(proc_set) - 1]])
+
+    starts = proc_set[run_starts]
+    ends = proc_set[run_ends]
+    mask = (ends - starts) >= min_size
+
+    proc_regions = {}
+    for s, e in zip(starts[mask], ends[mask]):
+        proc_regions[int(s)] = {'start': int(s), 'end': int(e)}
     return proc_regions
 
 def Data_Norm(x, y):
@@ -189,24 +244,37 @@ def Convert_Bin_To_Domain_TMP(n_bins, signal_idx, gap_idx, pvalues=None, pvalue_
                     bins[key]['tag'] = "boundary"
     return bins
 
-def scale_mat(csr_matrix, window_size=5):
-    # Convert CSR matrix to LIL for efficient row-based operations
-    lil_mat = csr_matrix.tolil()
-    n_bins = csr_matrix.shape[0]
-    # Compute the range once to avoid recomputation
-    all_ranges = [list(range((n_bins * k), (n_bins * n_bins), 1 + n_bins)) for k in range(1, 2 * window_size)]
-    for current_range in tqdm(all_ranges):
-        mat_row = np.floor_divide(current_range, n_bins).astype(int)
-        mat_column = np.mod(current_range, n_bins)
-        mat_values = lil_mat[mat_row, mat_column].toarray().flatten()
-        # Scale values
-        scale_values = (mat_values - np.mean(mat_values)) / np.std(mat_values, ddof=1)
-        # Update LIL matrix
-        lil_mat[mat_column, mat_row] = scale_values
-    # Convert back to CSR for efficient matrix operations (optional, based on subsequent use-case)
-    return lil_mat.tocsr()
+def scale_mat(input_csr, window_size=5):
+    # ~3x aster than old version
+    from scipy.sparse import coo_matrix as coo_ctor
+    n_bins = input_csr.shape[0]
+    max_k = 2 * window_size
 
-def NucDom(bins_chr, csr_mat_chr, window_size, statFilter=True):
+    repl_rows, repl_cols, repl_vals = [], [], []
+    for k in range(1, max_k):
+        diag_vals = input_csr.diagonal(-k).astype(np.float64)
+        scaled = (diag_vals - np.mean(diag_vals)) / np.std(diag_vals, ddof=1)
+        rows_k = np.arange(n_bins - k)
+        repl_rows.append(rows_k)
+        repl_cols.append(rows_k + k)
+        repl_vals.append(scaled)
+
+    repl_rows = np.concatenate(repl_rows)
+    repl_cols = np.concatenate(repl_cols)
+    repl_vals = np.concatenate(repl_vals)
+
+    coo = input_csr.tocoo()
+    offsets = coo.col - coo.row
+    keep = ~((offsets >= 1) & (offsets < max_k))
+
+    final_row = np.concatenate([coo.row[keep], repl_rows])
+    final_col = np.concatenate([coo.col[keep], repl_cols])
+    final_data = np.concatenate([coo.data[keep].astype(np.float64), repl_vals])
+
+    return coo_ctor((final_data, (final_row, final_col)),
+                     shape=(n_bins, n_bins)).tocsr()
+
+def NucDom(bins_chr, csr_mat_chr, window_size, njobs = -1, statFilter=True):
     """
 
     :param hic_data: a list corresponding to the Hi-C data
@@ -222,9 +290,7 @@ def NucDom(bins_chr, csr_mat_chr, window_size, statFilter=True):
     local_ext = np.ones(n_bins) * (-0.5)
     # Step 1: Get diamond matrix mean
     print("Get diamond matrix mean")
-    for i in tqdm(range(n_bins)):
-        diamond_mean = Get_Diamond_Matrix_Mean(csr_mat_chr, i, window_size)
-        mean_cf[i] = diamond_mean
+    mean_cf = Get_Diamond_Matrix_Mean(csr_mat_chr, window_size)
     # Step 2: Find Gap region
     print("Detect_Local_Extreme")
     gap_idx = Which_Gap_Region(csr_mat_chr)
@@ -237,10 +303,21 @@ def NucDom(bins_chr, csr_mat_chr, window_size, statFilter=True):
         # Step 3: StatFilter
         print("StatFilter")
         csr_mat_chr_scale = scale_mat(csr_mat_chr,window_size)
-        for key in tqdm(proc_regions):
-            start = proc_regions[key]['start']
-            end = proc_regions[key]['end']
-            pvalue[start:end] = Get_Pvalue(csr_mat_chr_scale[start:end + 1, start:end + 1].todense(), window_size, 1)
+        region_list = [(r['start'], r['end']) for r in proc_regions.values()]
+        # pre-extract dense submatrices (shared by both old and new)
+        dense_subs = [np.asarray(csr_mat_chr_scale[s:e + 1, s:e + 1].todense(), dtype=np.float64)
+                  for s, e in region_list]
+        results = Parallel(n_jobs=njobs)(
+            delayed(Get_Pvalue)(sub, window_size, 1) for sub in tqdm(dense_subs, desc='parallel pvalue')
+        )
+        for (s, e), pv in zip(region_list, results):
+            pvalue[s:e] = pv
+
+        # for key in tqdm(proc_regions):
+        #     start = proc_regions[key]['start']
+        #     end = proc_regions[key]['end']
+        #     pvalue[start:end] = Get_Pvalue(csr_mat_chr_scale[start:end + 1, start:end + 1].todense(), window_size, 1)
+
         local_ext[(local_ext == -1) & (pvalue < 0.05)] = -2
         local_ext[local_ext == -1] = 0
         local_ext[local_ext == -2] = -1
@@ -255,7 +332,7 @@ def NucDom(bins_chr, csr_mat_chr, window_size, statFilter=True):
                                         gap_idx=np.where(local_ext == -0.5)[0],
                                         pvalues=pvalue,
                                         pvalue_cut=pvalue_cut)
-    return domains
+    return domains,mean_cf
 
 def NucDom_RG(bins_chr, csr_mat_chr, window_size, statFilter=True):
     """
@@ -273,9 +350,7 @@ def NucDom_RG(bins_chr, csr_mat_chr, window_size, statFilter=True):
     local_ext = np.ones(n_bins) * (-0.5)
     # Step 1: Get diamond matrix mean
     print("Get diamond matrix mean")
-    for i in tqdm(range(n_bins)):
-        diamond_mean = Get_Diamond_Matrix_Mean(csr_mat_chr, i, window_size)
-        mean_cf[i] = diamond_mean
+    mean_cf = Get_Diamond_Matrix_Mean(csr_mat_chr, window_size)
     mean_cf = np.nan_to_num(mean_cf, nan=0)
     # to preserve boundnaries
     bidx = bins_chr.loc[bins_chr['tag']==1,'arrayid']
@@ -313,7 +388,7 @@ def NucDom_RG(bins_chr, csr_mat_chr, window_size, statFilter=True):
                                         pvalues=pvalue,
                                         pvalue_cut=pvalue_cut,
                                         rgmap=True)
-    return domains
+    return domains,mean_cf
 
 def find_gaps(csr_mat, max_non_zeros=3, min_zeros=10):
     diagonal = csr_mat.diagonal()
@@ -524,8 +599,7 @@ def callTADs(ret, gaps, bins_chr,rgmap=False):
             max_score = 1
             result['score'][i] = 1 - int((result['score'][i] / max_score) * 10)
     result_df = pd.DataFrame(result)
-    # # convert to nucleosome-bin based idx
-    # result_df.iloc[1:,0] -= 1
+    # convert to nucleosome-bin based idx
     result_df['end'] -= 1
     bins_chr['idx'] = np.arange(len(bins_chr))
     # refine by gaps; should be in same chrom
@@ -603,43 +677,28 @@ def makeConsecutiveCoor(nucdom_df,chroms,shiftsize=0):
     nucdom_df_adj.iloc[boundary_idx+1, 1] -= shiftsize
     return nucdom_df_adj
 
-def TransferLearning(targeted_tads_df, h1_nucdom_f, h1_ctcf_f, targeted_clr, targeted_ctcf_f):
+def TransferLearning(targeted_tads_df, h1_nucdom_f, factor_pairs, targeted_clr):
     """
-    Perform transfer learning from H1 nucleosome domains to a targeted dataset.
+    Perform transfer learning from H1 nucleosome domains to a targeted dataset
+    using multiple factors.
 
     Parameters:
       targeted_tads_df (pd.DataFrame): DataFrame of the targeted nucleosome domains
           (e.g. GM12878) with at least the columns ["chrom", "start", "end", "tag", ...].
       h1_nucdom_f (str): File path for the H1 nucleosome domain file.
-      h1_ctcf_f (str): File path for the H1 CTCF bigWig file.
-      targeted_ctcf_f (str): File path for the targeted CTCF bigWig file.
+      factor_pairs (list): List of tuples, each containing (h1_factor_bw, targeted_factor_bw).
+          Example: [('H1_CTCF.bw', 'GM_CTCF.bw'), ('H1_Pol2.bw', 'GM_Pol2.bw')]
+          Boundaries are prioritized by order (first factor > second > ...).
+      targeted_clr: Cooler object for the targeted dataset.
 
     Returns:
       nucdom_trans (pd.DataFrame): The targeted nucleosome domain DataFrame with transferred boundaries.
     """
 
-    # --- H1 nucleosome domain and CTCF signal processing ---
-    # load H1 nucdom and keep boundaries
+    # --- Load H1 nucleosome domain and keep boundaries ---
     h1_nucdom = pd.read_table(h1_nucdom_f)
     h1_nucb = h1_nucdom[h1_nucdom['tag'] == 'boundary'].copy()
     h1_nucb['mid'] = h1_nucb[['start', 'end']].mean(axis=1).astype(int)
-
-    # open bigWig files for H1 and targeted CTCF
-    h1_ctcf_bw = pybw.open(h1_ctcf_f)
-    targeted_ctcf_bw = pybw.open(targeted_ctcf_f)
-
-    extsize = 100
-    h1_ctcf_signal = []
-    targeted_ctcf_signal = []
-
-    for idx, row in tqdm(h1_nucb.iterrows(), desc="Processing H1 boundaries"):
-        h1_ctcf_signal.append(h1_ctcf_bw.stats(row['chrom'], row['start'] - extsize, row['end'] + extsize,
-                                               type='max', exact=True)[0])
-        targeted_ctcf_signal.append(targeted_ctcf_bw.stats(row['chrom'], row['start'] - extsize, row['end'] + extsize,
-                                                           type='max', exact=True)[0])
-
-    h1_nucb['h1_ctcf'] = h1_ctcf_signal
-    h1_nucb['targeted_ctcf'] = targeted_ctcf_signal
 
     # helper function to find an elbow point (signal cutoff)
     def findSignalCut(vals, outname=None, density_cut=0.0015, xmin=10):
@@ -661,33 +720,96 @@ def TransferLearning(targeted_tads_df, h1_nucdom_f, h1_ctcf_f, targeted_clr, tar
         xcut = np.max([xcut, xmin])
         return xcut
 
-    h1_ctcf_cut = findSignalCut(h1_nucb['h1_ctcf'].values, density_cut=0.015)
-    targeted_ctcf_cut = findSignalCut(h1_nucb['targeted_ctcf'].values)
-
-    h1_nucb['h1_ctcf_binary'] = np.where(h1_nucb['h1_ctcf'] >= h1_ctcf_cut, 1, 0)
-    h1_nucb['targeted_ctcf_binary'] = np.where(h1_nucb['targeted_ctcf'] >= targeted_ctcf_cut, 1, 0)
-
-    # select tentative transfer boundaries (boundaries with high signal in both datasets)
-    h1_nucb_trans = h1_nucb[h1_nucb[['h1_ctcf_binary', 'targeted_ctcf_binary']].sum(axis=1) == 2]
-
     # --- Prepare targeted nucleosome domains ---
-    # In this function, the targeted_tads_df is assumed to be the nucleosome domain file
-    # (e.g. for GM12878) already loaded as a DataFrame.
     targeted_nucdom = targeted_tads_df.copy()
-    # keep boundaries only
     targeted_nucb = targeted_nucdom[targeted_nucdom['tag'] == 'boundary'].copy()
 
-    # current boundary overlap with h1_nucb_trans
-    inter_res = pybt.BedTool.intersect(
-        pybt.BedTool.from_dataframe(h1_nucb_trans[['chrom', 'start', 'end']]),
-        pybt.BedTool.from_dataframe(targeted_nucb[['chrom', 'start', 'end']]),
-        u=True
-    ).to_dataframe()
+    # Accumulate all boundaries to transfer (from all factors)
+    all_trans_boundaries = pd.DataFrame(columns=['chrom', 'start', 'end'])
+    extsize = 100
 
-    # boundaries that do not overlap (i.e. to be transferred)
-    h1_nucb_trans_noolp = pd.merge(h1_nucb_trans, inter_res, how='left', indicator=True) \
-        .query('_merge == "left_only"') \
-        .drop('_merge', axis=1)
+    # --- Process each factor pair ---
+    for factor_idx, (h1_factor_f, targeted_factor_f) in enumerate(factor_pairs):
+        print(f"\n=== Processing factor {factor_idx + 1}: {h1_factor_f} / {targeted_factor_f} ===")
+
+        h1_factor_bw = pybw.open(h1_factor_f)
+        targeted_factor_bw = pybw.open(targeted_factor_f)
+
+        h1_signal = []
+        targeted_signal = []
+
+        for idx, row in tqdm(h1_nucb.iterrows(), desc=f"Processing H1 boundaries (factor {factor_idx + 1})"):
+            h1_signal.append(h1_factor_bw.stats(row['chrom'], row['start'] - extsize, row['end'] + extsize,
+                                                type='max', exact=True)[0])
+            targeted_signal.append(targeted_factor_bw.stats(row['chrom'], row['start'] - extsize, row['end'] + extsize,
+                                                             type='max', exact=True)[0])
+
+        h1_factor_bw.close()
+        targeted_factor_bw.close()
+
+        # Create temporary DataFrame for this factor
+        h1_nucb_temp = h1_nucb.copy()
+        h1_nucb_temp['h1_signal'] = h1_signal
+        h1_nucb_temp['targeted_signal'] = targeted_signal
+
+        # Find cutoffs
+        h1_cut = findSignalCut(h1_nucb_temp['h1_signal'].values, density_cut=0.015)
+        targeted_cut = findSignalCut(h1_nucb_temp['targeted_signal'].values)
+
+        h1_nucb_temp['h1_binary'] = np.where(h1_nucb_temp['h1_signal'] >= h1_cut, 1, 0)
+        h1_nucb_temp['targeted_binary'] = np.where(h1_nucb_temp['targeted_signal'] >= targeted_cut, 1, 0)
+
+        # Select candidate transfer boundaries (high signal in both)
+        candidates = h1_nucb_temp[h1_nucb_temp[['h1_binary', 'targeted_binary']].sum(axis=1) == 2].copy()
+
+        if len(candidates) == 0:
+            print(f"No candidate boundaries found for factor {factor_idx + 1}")
+            continue
+
+        print(f"Factor {factor_idx + 1}: {len(candidates)} initial candidates")
+
+        # Remove candidates that overlap with existing targeted boundaries
+        if len(targeted_nucb) > 0:
+            inter_with_targeted = pybt.BedTool.intersect(
+                pybt.BedTool.from_dataframe(candidates[['chrom', 'start', 'end']]),
+                pybt.BedTool.from_dataframe(targeted_nucb[['chrom', 'start', 'end']]),
+                u=True
+            )
+            if len(inter_with_targeted) > 0:
+                olp_with_targeted = inter_with_targeted.to_dataframe()
+                candidates = pd.merge(candidates, olp_with_targeted, how='left', indicator=True) \
+                    .query('_merge == "left_only"') \
+                    .drop('_merge', axis=1)
+
+        print(f"Factor {factor_idx + 1}: {len(candidates)} candidates after removing overlap with existing boundaries")
+
+        # Remove candidates that overlap with previously selected transfer boundaries (prioritize earlier factors)
+        if len(all_trans_boundaries) > 0 and len(candidates) > 0:
+            inter_with_prev = pybt.BedTool.intersect(
+                pybt.BedTool.from_dataframe(candidates[['chrom', 'start', 'end']]),
+                pybt.BedTool.from_dataframe(all_trans_boundaries[['chrom', 'start', 'end']]),
+                u=True
+            )
+            if len(inter_with_prev) > 0:
+                olp_with_prev = inter_with_prev.to_dataframe()
+                candidates = pd.merge(candidates, olp_with_prev, how='left', indicator=True) \
+                    .query('_merge == "left_only"') \
+                    .drop('_merge', axis=1)
+
+        print(f"Factor {factor_idx + 1}: {len(candidates)} boundaries to transfer (after priority filtering)")
+
+        # Add to cumulative list
+        if len(candidates) > 0:
+            all_trans_boundaries = pd.concat([all_trans_boundaries, candidates[['chrom', 'start', 'end']]])
+
+    print(f"\n=== Total boundaries to transfer: {len(all_trans_boundaries)} ===")
+
+    if len(all_trans_boundaries) == 0:
+        print("No boundaries to transfer, returning original data")
+        return targeted_nucdom
+
+    # Use all_trans_boundaries as the boundaries to transfer
+    h1_nucb_trans_noolp = all_trans_boundaries.copy()
 
     # --- Define helper functions for splitting/merging regions ---
     def split_and_merge_adjust_rows_with_tags(row):

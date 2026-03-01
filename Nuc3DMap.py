@@ -37,6 +37,7 @@ from Nuc3DMap_nucload import PrepNuc, load_raw_pairs, rev_coor, BinpairPr, nuclo
 from Nuc3DMap_nucmerge import chrom_norm, iMHiC, visualConverge, nucmerge_save_cooler
 from Nuc3DMap_nucTD import preTADclr, NucDom, callTADs, makeConsecutiveCoor, NucDom_RG, TransferLearning
 from Nuc3DMap_nucIL import build_RGMap, NucIL_detection, transfer_NucLoop
+import pyBigWig
 
 # set memory limitation
 def set_memory_limit(limit):
@@ -224,8 +225,17 @@ def nucprep(inputfiles, gsize, prefixname, minmapq, bwafasta, inpsdir, tmpdir, t
 @click.option('--chunksize', '-cs', default = 15000000, type=int, help='The chunksize to load the .pairs file')
 @click.option('--sampling', '-spl', default = 1.0, type=float, help='Sampling pairs for robust test, ignore for normal usage, [0,1]')
 @click.option('--nproc', '-np', default = 1, type=int, help='The number of parallel processors')
+@click.option(
+    '--resolution', '-res',
+    default=0,
+    type=int,
+    help='Resolution of the nucleosome-level contact map; if parameter is provided '
+         'and larger than 500, nucload will start to aggregate adjacent nucleosomes '
+         'to approach the resolution (median size of grouped nucleosomes), consider this parameter when the sequence depth '
+         'is not enough'
+)
 def nucload(pairsfile, nuclocfile, geneannot, outdir, refgenome, reportnooverlap, statsreport, overlapcut, match,
-            chunksize, sampling, nproc):
+            chunksize, sampling, nproc, resolution):
     prefix = Path(pairsfile).stem
     if outdir is None:
         outdir = './'
@@ -252,7 +262,7 @@ def nucload(pairsfile, nuclocfile, geneannot, outdir, refgenome, reportnooverlap
             print("Unzip successfully")
         else:
             print(f"Failed to unizp {nuclocfile}, please try unzip manually and re-run the command")
-    prenuc = PrepNuc(nuc_f=nuclocfile, gene_f=geneannot, ref_dict=ref_dict,
+    prenuc = PrepNuc(nuc_f=nuclocfile, gene_f=geneannot, ref_dict=ref_dict, resolution=resolution,
                      prefix=prefix, outdir=outdir, extsize=nuc_extsize, min_interval=10)
     nucbins = prenuc.binproc()
 
@@ -398,14 +408,22 @@ def nucmerge(microc, hic, enzymedigestf, outdir, refgenome, visualize, savetmpfi
 @click.option('--imhiccool', '-imhc', type=click.Path(exists=True), required=True, help='Integrated MicroC-HiC.cool resulted from nucmerge.')
 @click.option('--winsize', '-ws', default = 10, type=int, help='window size for calling NucDom')
 @click.option('--outdir', '-od', type=click.Path(), help='Specify the output directory')
+@click.option('--outprefix', '-op', type=str, default='', help='Specify the output prefix')
 @click.option('--shiftsize', '-ss', default = 0, type=float, help='Empirical shift size for boundaries, default 0')
+@click.option('--diamondmean', '-dm', is_flag=True, help="Generate bigwig file for diamond mean score")
 @click.option('--rgmap', '-rg', is_flag=True, help='Input is renormalized grouping map')
-@click.option('--translearning','-tl', type=str,
-              help='Usage: -tl H1_iMHiC.txt,H1_CTCF.bigwig,foo_CTCF.bigwig; Using H1 NucB (hg38) and H1 CTCF signal to infer NucB based on closed CTCF signal between H1 and targeted cell type\'s CTCF signal, '
-                   'Used with cautions and only consider to use this parameter when sequence depth is not enough. Currently only support human hg38')
-def nuctd(imhiccool, winsize, outdir, shiftsize, rgmap, translearning):
+@click.option('--threads', '-j', default=8, help="Parallel Pvalue calculation, -1 use all available")
+@click.option('--translearning','-tl', type=str, multiple=True,
+              help='Usage: -tl H1_iMHiC.txt,H1_CTCF.bigwig,foo_CTCF.bigwig -tl H1_iMHiC.txt,H1_Pol2.bigwig,foo_Pol2.bigwig; '
+                   'Multiple factors can be specified by using -tl multiple times. Boundaries are prioritized by order (first > second > ...). '
+                   'Using H1 NucB (hg38) and H1 factor signal to infer NucB based on similar factor signal between H1 and targeted cell type. '
+                   'Used with caution; only consider using this parameter when sequence depth is not enough. Currently only supports human hg38.')
+def nuctd(imhiccool, winsize, outdir, outprefix, shiftsize, rgmap, translearning, diamondmean, threads):
     # generate chrom_iter
-    prefix = os.path.basename(imhiccool).split('_')[0]
+    if outprefix == '':
+        prefix = os.path.basename(imhiccool).split('_')[0]
+    else:
+        prefix = outprefix
     if outdir is None:
         outdir = './'
     imhic_clr = cooler.Cooler(imhiccool)
@@ -417,31 +435,56 @@ def nuctd(imhiccool, winsize, outdir, shiftsize, rgmap, translearning):
     else:
         tolerance = 2
         mingapsize = 10
-    winsize = winsize
-    tads_list = []
-    for chrom in chroms:
-        print(f"Processing {chrom}")
-        bins_chr, csr_mat_chr, gaps = preTADclr(imhic_clr, chrom, tolerance=tolerance, mingapsize=mingapsize, rgmap=rgmap)
-        if rgmap:
-            domains = NucDom_RG(bins_chr, csr_mat_chr, winsize)
-        else:
-            domains = NucDom(bins_chr, csr_mat_chr, winsize)
-        result_df = callTADs(domains, gaps, bins_chr, rgmap=rgmap)
-        tads_list.append(result_df)
-
-    # write files
-    tads_df = pd.concat(tads_list)
-    # tads_df.to_pickle(f'{outdir}/tads_df.pkl')
-    tads_df_adj = makeConsecutiveCoor(tads_df,chroms,shiftsize)
-    domains_df = tads_df_adj[tads_df_adj['tag']=='domain']
+    
     if shiftsize != 0:
         outname = f'{prefix}_iMHiC.win{winsize}.ss{shiftsize}'
     else:
         outname = f'{prefix}_iMHiC.win{winsize}'
 
+    winsize = winsize
+    tads_list = []
+    if diamondmean:
+        bw_raw = pyBigWig.open(f"{outdir}/{outname}_mean_cf.bw", "w")
+        bw_raw.addHeader(list(imhic_clr.chromsizes.items()))
+    for chrom in chroms:
+        print(f"Processing {chrom}")
+        bins_chr, csr_mat_chr, gaps = preTADclr(imhic_clr, chrom, coarsen=0, tolerance=tolerance, mingapsize=mingapsize, rgmap=rgmap)
+        if rgmap:
+            domains, mean_cf = NucDom_RG(bins_chr, csr_mat_chr, winsize)
+        else:
+            domains, mean_cf = NucDom(bins_chr, csr_mat_chr, winsize, njobs=threads, statFilter=True)
+        result_df = callTADs(domains, gaps, bins_chr, rgmap=rgmap)
+        tads_list.append(result_df)
+        if diamondmean:
+            starts = bins_chr['start'].values.astype(int).tolist()
+            ends = bins_chr['end'].values.astype(int).tolist()
+            vals = mean_cf.copy()
+            vals[np.isnan(vals)] = 0
+            vals = vals.tolist()
+            bw_raw.addEntries([chrom]*len(starts), starts, ends=ends, values=vals)
+    if diamondmean:
+        bw_raw.close()
+    # write files
+    tads_df = pd.concat(tads_list)
+    # tads_df.to_pickle(f'{outdir}/tads_df.pkl')
+    tads_df_adj = makeConsecutiveCoor(tads_df,chroms,shiftsize)
+    domains_df = tads_df_adj[tads_df_adj['tag']=='domain']
+
     if translearning:
-        h1_nucdom_f, h1_ctcf_f, targted_ctcf_f = translearning.split(',')
-        tads_df_final = TransferLearning(tads_df_adj, h1_nucdom_f, h1_ctcf_f, imhic_clr, targted_ctcf_f)
+        # Parse the first -tl to get h1_nucdom_f (shared across all factors)
+        first_tl = translearning[0].split(',')
+        h1_nucdom_f = first_tl[0]
+
+        # Build factor_pairs from all -tl arguments
+        factor_pairs = []
+        for tl in translearning:
+            parts = tl.split(',')
+            h1_factor_f = parts[1]
+            targeted_factor_f = parts[2]
+            factor_pairs.append((h1_factor_f, targeted_factor_f))
+
+        print(f"Transfer learning with {len(factor_pairs)} factor(s), prioritized by order")
+        tads_df_final = TransferLearning(tads_df_adj, h1_nucdom_f, factor_pairs, imhic_clr)
         domains_df_final = tads_df_final[tads_df_final['tag'] == 'domain']
     else:
         tads_df_final = tads_df_adj.copy()
