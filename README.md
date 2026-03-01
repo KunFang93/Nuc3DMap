@@ -1,5 +1,7 @@
 # Nuc3DMap
 A comprehensive tool to study nucleosome-level genome architectures 
+## Update log
+v1.1 optimzie speed for NucTD (~ 10x faster)
 ## Installation
 Method1: direct conda/mamba installation, need bioconda repo (**mamba is strongly recommended**)
 ```
