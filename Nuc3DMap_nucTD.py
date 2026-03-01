@@ -524,8 +524,8 @@ def callTADs(ret, gaps, bins_chr,rgmap=False):
             max_score = 1
             result['score'][i] = 1 - int((result['score'][i] / max_score) * 10)
     result_df = pd.DataFrame(result)
-    # convert to nucleosome-bin based idx
-    result_df.iloc[1:,0] -= 1
+    # # convert to nucleosome-bin based idx
+    # result_df.iloc[1:,0] -= 1
     result_df['end'] -= 1
     bins_chr['idx'] = np.arange(len(bins_chr))
     # refine by gaps; should be in same chrom
