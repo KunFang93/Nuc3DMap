@@ -83,8 +83,9 @@ nohup Nuc3DMap nucmerge -mc ../nucload/H1_MicroC.1.0.cool -hc ../nucload/H1_HiC_
 Nuc3DMap nuctd -imhc <./H1_iMHiC.cool>
                 -ws <10 default 10>
                 -od <./>
+                -j -1 # use all avaiable cpu
 e.g.,
-nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -od ./ &> h1.nuctd.log &
+nohup Nuc3DMap nuctd -imhc ../nucmerge/H1_iMHiC_212025.cool -ws 10 -j -1 -od ./ &> h1.nuctd.log &
 ```
 #### Step5. Detect NucIL and NucL(oop)
 ```
